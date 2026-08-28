@@ -1,0 +1,54 @@
+name: QA CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  cypress-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar testes Cypress (com reporter Mochawesome)
+        run: npm run cy:run
+
+      - name: Mesclar relatórios Mochawesome
+        run: npm run posttest:merge
+
+      - name: Gerar relatório HTML
+        run: npm run posttest:html
+
+      - name: Calcular métricas de qualidade (quality gate)
+        run: npm run metrics
+
+      - name: Publicar relatórios e métricas como artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-qa-reports
+          path: |
+            cypress/reports
+          retention-days: 15
+
+      - name: Publicar screenshots de falhas (se houver)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots
+          path: cypress/screenshots
+          if-no-files-found: ignore
